@@ -1,32 +1,69 @@
 pipeline {
   agent any
+ 
   environment {
-    IMAGE_NAME = "prasanna1808/dev"
+    DEV_IMAGE = 'prasanna1808/dev:latest'
+    PROD_IMAGE = 'prasanna1808/prod:latest'
   }
+
   stages {
     stage('Checkout') {
       steps {
-        git branch: 'dev', url: 'https://github.com/Prasannaramesh13/nodejs_project_final.git'
-      }
-    }
-    stage('Build Docker Image') {
-      steps {
-        sh './build.sh'
-      }
-    }
-    stage('Push to Docker Hub') {
-      steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-          sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
-          sh "docker tag yourimage $IMAGE_NAME:latest"
-          sh "docker push $IMAGE_NAME:latest"
+        checkout scm
+        script {
+          BRANCH_NAME = env.GIT_BRANCH.replaceAll('origin/', '')
+          echo "Current branch: ${BRANCH_NAME}"
         }
       }
     }
-    stage('Deploy') {
+
+    stage('Build Docker Image') {
+      steps {
+        script {
+          sh 'docker build -t node-image .'
+        }
+      }
+    }
+
+    stage('Push to Docker Hub') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+          script {
+            sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+
+            if (BRANCH_NAME == "dev") {
+              sh """
+                docker tag node-image $DEV_IMAGE
+                docker push $DEV_IMAGE
+              """
+            } else if (BRANCH_NAME == "main") {
+              sh """
+                docker tag node-image $PROD_IMAGE
+                docker push $PROD_IMAGE
+              """
+            } else {
+              echo "Not a dev or main branch. Skipping push."
+            }
+          }
+        }
+      }
+    }
+
+    stage('Deploy (Optional)') {
+      when {
+        expression { return BRANCH_NAME == "dev" || BRANCH_NAME == "main" }
+      }
       steps {
         sh './deploy.sh'
       }
     }
   }
+
+  post {
+    always {
+      sh 'docker logout'
+    }
+  }
+}
+
 }
