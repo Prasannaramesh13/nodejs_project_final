@@ -1,0 +1,32 @@
+pipeline {
+  agent any
+  environment {
+    IMAGE_NAME = "prasanna1808/dev"
+  }
+  stages {
+    stage('Checkout') {
+      steps {
+        git branch: 'dev', url: 'https://github.com/Prasannaramesh13/nodejs_project_final.git'
+      }
+    }
+    stage('Build Docker Image') {
+      steps {
+        sh './build.sh'
+      }
+    }
+    stage('Push to Docker Hub') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+          sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+          sh "docker tag yourimage $IMAGE_NAME:latest"
+          sh "docker push $IMAGE_NAME:latest"
+        }
+      }
+    }
+    stage('Deploy') {
+      steps {
+        sh './deploy.sh'
+      }
+    }
+  }
+}
