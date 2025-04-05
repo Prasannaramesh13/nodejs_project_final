@@ -1,8 +1,23 @@
 #!/bin/bash
+
 echo "Deploying to server..."
+
+# Accept BRANCH_NAME as an argument
+BRANCH_NAME=$1
+
+# Set image and container name based on branch
+if [ "$BRANCH_NAME" == "main" ] || [ "$BRANCH_NAME" == "prod" ]; then
+    IMAGE="prasanna1808/prod:latest"
+    CONTAINER_NAME="app-prod"
+else
+    IMAGE="prasanna1808/dev:latest"
+    CONTAINER_NAME="app-dev"
+fi
+
+# Connect to EC2 and deploy
 ssh -i AWS.pem ubuntu@<EC2_PUBLIC_IP> << EOF
-  docker pull prasanna1808/dev:latest
-  docker stop app || true
-  docker rm app || true
-  docker run -d --name app -p 3000:3000 prasanna1808/dev:latest
+    docker pull $IMAGE
+    docker stop $CONTAINER_NAME || true
+    docker rm $CONTAINER_NAME || true
+    docker run -d --name $CONTAINER_NAME -p 80:3000 $IMAGE
 EOF
